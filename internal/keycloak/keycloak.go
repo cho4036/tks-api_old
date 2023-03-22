@@ -8,7 +8,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/openinfradev/tks-api/pkg/domain"
 	"github.com/openinfradev/tks-api/pkg/log"
-	"strings"
 )
 
 type IKeycloak interface {
@@ -22,9 +21,9 @@ type IKeycloak interface {
 
 	CreateUser(organizationName string, user *gocloak.User, token string) error
 	GetUser(organizationName string, userAccountId string, token string) (*gocloak.User, error)
-	GetUsers(organizationName string, token string) ([]*domain.User, error)
+	GetUsers(organizationName string, token string) ([]*gocloak.User, error)
 	DeleteUser(organizationName string, userAccountId string, token string) error
-	UpdateUser(organizationName string, userAccountId string, user domain.User, token string) error
+	UpdateUser(organizationName string, user *gocloak.User, accessToken string) error
 
 	GetAccessTokenByIdPassword(accountId string, password string, organizationName string) (*domain.User, error)
 	VerifyAccessToken(token string, organizationName string) error
@@ -255,30 +254,21 @@ func (k *Keycloak) GetUser(organizationName string, accountId string, accessToke
 	return users[0], nil
 }
 
-func (k *Keycloak) GetUsers(organizationName string, accessToken string) ([]*domain.User, error) {
+func (k *Keycloak) GetUsers(organizationName string, accessToken string) ([]*gocloak.User, error) {
 	ctx := context.Background()
 	//TODO: this is rely on the fact that username is the same as userAccountId and unique
 	users, err := k.client.GetUsers(ctx, accessToken, organizationName, gocloak.GetUsersParams{})
 	if err != nil {
 		return nil, err
 	}
-	domainUser := make([]*domain.User, len(users))
-	for i, user := range users {
-		domainUser[i] = k.reflectUser(*user)
-	}
-	return domainUser, nil
+
+	return users, nil
 }
 
-func (k *Keycloak) UpdateUser(organizationName string, userAccountId string, user domain.User, accessToken string) error {
+func (k *Keycloak) UpdateUser(organizationName string, user *gocloak.User, accessToken string) error {
 	ctx := context.Background()
-	u, err := k.GetUser(organizationName, userAccountId, accessToken)
-	if err != nil {
-		return err
-	}
-	user.ID = *u.ID
-	gocloakUser := k.reflectUserRepresentation(user)
-	gocloakUser.Enabled = gocloak.BoolP(true)
-	err = k.client.UpdateUser(ctx, accessToken, organizationName, *gocloakUser)
+	user.Enabled = gocloak.BoolP(true)
+	err := k.client.UpdateUser(ctx, accessToken, organizationName, *user)
 	if err != nil {
 		return err
 	}
@@ -347,7 +337,6 @@ func (c *Keycloak) loginAdmin(ctx context.Context) (*gocloak.JWT, error) {
 
 func (c *Keycloak) ensureClientProtocolMappers(ctx context.Context, token *gocloak.JWT, realm string, clientId string,
 	scope string, mapper gocloak.ProtocolMapperRepresentation) error {
-
 	//TODO: Check current logic(if exist, do nothing) is fine
 	clients, err := c.client.GetClients(ctx, token.AccessToken, realm, gocloak.GetClientsParams{
 		ClientID: &clientId,
@@ -560,46 +549,6 @@ func (k *Keycloak) createDefaultClient(ctx context.Context, accessToken string, 
 	}
 
 	return id, nil
-}
-
-func (k *Keycloak) reflectUser(user gocloak.User) *domain.User {
-	var roles []domain.Role
-	var organizations []domain.Organization
-
-	if user.Groups != nil {
-		for _, group := range *user.Groups {
-			slice := strings.Split(group, "@")
-			roles = append(roles, domain.Role{Name: slice[0]})
-			organizations = append(organizations, domain.Organization{Name: slice[1]})
-		}
-	}
-
-	return &domain.User{
-		ID:            *user.ID,
-		AccountId:     *user.Username,
-		Roles:         roles,
-		Organizations: organizations,
-	}
-}
-
-func (k *Keycloak) reflectUserRepresentation(user domain.User) *gocloak.User {
-	var groups []string
-	for i, role := range user.Roles {
-		groups = append(groups, role.Name+"@"+user.Organizations[i].Name)
-	}
-
-	return &gocloak.User{
-		ID:       gocloak.StringP(user.ID),
-		Username: gocloak.StringP(user.AccountId),
-		Credentials: &[]gocloak.CredentialRepresentation{
-			{
-				Type:      gocloak.StringP("password"),
-				Value:     gocloak.StringP(user.Password),
-				Temporary: gocloak.BoolP(false),
-			},
-		},
-		Groups: &groups,
-	}
 }
 
 func (k *Keycloak) reflectOrganization(org gocloak.RealmRepresentation) *domain.Organization {

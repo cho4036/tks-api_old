@@ -1,9 +1,6 @@
 package usecase
 
 import (
-	"fmt"
-	"github.com/Nerzal/gocloak/v13"
-	"github.com/openinfradev/tks-api/internal/helper"
 	"github.com/openinfradev/tks-api/internal/keycloak"
 	"github.com/openinfradev/tks-api/internal/repository"
 	"github.com/openinfradev/tks-api/pkg/domain"
@@ -11,17 +8,17 @@ import (
 
 type IAuthUsecase interface {
 	Login(accountId string, password string, organizationName string) (domain.User, error)
-	Register(accountId string, password string, name string, organizationName string, role string, token string) (domain.User, error)
+	//Register(accountId string, password string, name string, organizationName string, role string, token string) (domain.User, error)
 	FetchRoles() (out []domain.Role, err error)
 	//AuthenticateToken(organization string, accessToken string) (*authenticator.Response, bool, error)
 }
 
 type AuthUsecase struct {
 	kc   keycloak.IKeycloak
-	repo repository.IAuthRepository
+	repo repository.IUserRepository
 }
 
-func NewAuthUsecase(r repository.IAuthRepository, kc keycloak.IKeycloak) IAuthUsecase {
+func NewAuthUsecase(r repository.IUserRepository, kc keycloak.IKeycloak) IAuthUsecase {
 	return &AuthUsecase{
 		repo: r,
 		kc:   kc,
@@ -59,55 +56,56 @@ func (r *AuthUsecase) Login(accountId string, password string, organizationName 
 	return user, nil
 }
 
-func (r *AuthUsecase) Register(accountId string, password string, name string, organizationName string, role string, accessToken string) (domain.User, error) {
-	// Validation check
-	user, err := r.kc.GetUser(organizationName, accountId, accessToken)
-	if err != nil {
-		return domain.User{}, err
-	}
-	if user != nil {
-		return domain.User{}, fmt.Errorf("Already existed user. %s", accountId)
-	}
-	_, err = r.repo.GetUserByAccountId(accountId)
-	if err == nil {
-		return domain.User{}, fmt.Errorf("Already existed user. %s", accountId)
-	}
-
-	// Create user in keycloak
-	groups := []string{fmt.Sprintf("%s@%s", role, organizationName)}
-	err = r.kc.CreateUser(organizationName, &gocloak.User{
-		Username: gocloak.StringP(accountId),
-		Credentials: &[]gocloak.CredentialRepresentation{
-			{
-				Type:      gocloak.StringP("password"),
-				Value:     gocloak.StringP(password),
-				Temporary: gocloak.BoolP(false),
-			},
-		},
-		Groups: &groups,
-	}, accessToken)
-	if err != nil {
-		return domain.User{}, err
-	}
-
-	hashedPassword, err := helper.HashPassword(password)
-	if err != nil {
-		return domain.User{}, err
-	}
-
-	resUser, err := r.repo.Create(accountId, hashedPassword, name)
-	if err != nil {
-		return domain.User{}, err
-	}
-
-	// [TODO] 임시로 tks-admin 으로 세팅한다.
-	err = r.repo.AssignRole(accountId, "tks-admin")
-	if err != nil {
-		return domain.User{}, err
-	}
-
-	return resUser, nil
-}
+// Deprecated: Use UserCreate instead
+//func (r *AuthUsecase) Register(accountId string, password string, name string, organizationName string, role string, accessToken string) (domain.User, error) {
+//	// Validation check
+//	user, err := r.kc.GetUser(organizationName, accountId, accessToken)
+//	if err != nil {
+//		return domain.User{}, err
+//	}
+//	if user != nil {
+//		return domain.User{}, fmt.Errorf("Already existed user. %s", accountId)
+//	}
+//	_, err = r.repo.GetUserByAccountId(accountId)
+//	if err == nil {
+//		return domain.User{}, fmt.Errorf("Already existed user. %s", accountId)
+//	}
+//
+//	// Create user in keycloak
+//	groups := []string{fmt.Sprintf("%s@%s", role, organizationName)}
+//	err = r.kc.CreateUser(organizationName, &gocloak.User{
+//		Username: gocloak.StringP(accountId),
+//		Credentials: &[]gocloak.CredentialRepresentation{
+//			{
+//				Type:      gocloak.StringP("password"),
+//				Value:     gocloak.StringP(password),
+//				Temporary: gocloak.BoolP(false),
+//			},
+//		},
+//		Groups: &groups,
+//	}, accessToken)
+//	if err != nil {
+//		return domain.User{}, err
+//	}
+//
+//	hashedPassword, err := helper.HashPassword(password)
+//	if err != nil {
+//		return domain.User{}, err
+//	}
+//
+//	resUser, err := r.repo.Create(accountId, hashedPassword, name)
+//	if err != nil {
+//		return domain.User{}, err
+//	}
+//
+//	// [TODO] 임시로 tks-admin 으로 세팅한다.
+//	err = r.repo.AssignRole(accountId, "tks-admin")
+//	if err != nil {
+//		return domain.User{}, err
+//	}
+//
+//	return resUser, nil
+//}
 
 func (u *AuthUsecase) FetchRoles() (out []domain.Role, err error) {
 	roles, err := u.repo.FetchRoles()
