@@ -21,11 +21,11 @@ type IUserUsecase interface {
 	DeleteAdmin(organizationId string) error
 	DeleteAll(ctx context.Context, organizationId string) error
 	Create(ctx context.Context, user *domain.User) (*domain.User, error)
-	List(ctx context.Context) (*[]domain.User, error)
-	GetByAccountId(ctx context.Context, accountId string) (*domain.User, error)
+	List(ctx context.Context, organizationId string) (*[]domain.User, error)
+	GetByAccountId(ctx context.Context, accountId string, organizationId string) (*domain.User, error)
 	UpdateByAccountId(ctx context.Context, accountId string, user *domain.User) (*domain.User, error)
-	UpdatePasswordByAccountId(ctx context.Context, accountId string, password string) error
-	DeleteByAccountId(ctx context.Context, accountId string) error
+	UpdatePasswordByAccountId(ctx context.Context, accountId string, password string, organizationId string) error
+	DeleteByAccountId(ctx context.Context, accountId string, organizationId string) error
 }
 
 type UserUsecase struct {
@@ -144,21 +144,17 @@ func (u *UserUsecase) CreateAdmin(orgainzationId string) (*domain.User, error) {
 	return &resUser, nil
 }
 
-func (u *UserUsecase) UpdatePasswordByAccountId(ctx context.Context, accountId string, newPassword string) error {
+func (u *UserUsecase) UpdatePasswordByAccountId(ctx context.Context, accountId string, newPassword string,
+	organizationId string) error {
 
 	token, ok := request.TokenFrom(ctx)
 	if ok == false {
 		return fmt.Errorf("token in the context is empty")
 	}
 
-	userInfo, ok := request.UserFrom(ctx)
-	if ok == false {
-		return fmt.Errorf("user in the context is empty")
-	}
-
-	originUser, err := u.kc.GetUser(userInfo.GetOrganizationId(), accountId, token)
+	originUser, err := u.kc.GetUser(organizationId, accountId, token)
 	if err != nil {
-		return errors.Wrap(err, "getting user from keycloak failed")
+		return err
 	}
 
 	originUser.Credentials = &[]gocloak.CredentialRepresentation{
@@ -169,14 +165,14 @@ func (u *UserUsecase) UpdatePasswordByAccountId(ctx context.Context, accountId s
 		},
 	}
 
-	err = u.kc.UpdateUser(userInfo.GetOrganizationId(), originUser, token)
+	err = u.kc.UpdateUser(organizationId, originUser, token)
 	if err != nil {
 		return errors.Wrap(err, "updating user in keycloak failed")
 	}
 
 	// update password in DB
 
-	user, err := u.repo.Get(accountId, userInfo.GetOrganizationId())
+	user, err := u.repo.Get(accountId, organizationId)
 	if err != nil {
 		return errors.Wrap(err, "getting user from repository failed")
 	}
@@ -198,13 +194,8 @@ func (u *UserUsecase) UpdatePasswordByAccountId(ctx context.Context, accountId s
 	return nil
 }
 
-func (u *UserUsecase) List(ctx context.Context) (*[]domain.User, error) {
-	userInfo, ok := request.UserFrom(ctx)
-	if ok == false {
-		return nil, fmt.Errorf("user in the context is empty")
-	}
-
-	users, err := u.repo.List(u.repo.OrganizationFilter(userInfo.GetOrganizationId()))
+func (u *UserUsecase) List(ctx context.Context, organizationId string) (*[]domain.User, error) {
+	users, err := u.repo.List(u.repo.OrganizationFilter(organizationId))
 	if err != nil {
 		return nil, err
 	}
@@ -212,13 +203,8 @@ func (u *UserUsecase) List(ctx context.Context) (*[]domain.User, error) {
 	return users, nil
 }
 
-func (u *UserUsecase) GetByAccountId(ctx context.Context, accountId string) (*domain.User, error) {
-	userInfo, ok := request.UserFrom(ctx)
-	if ok == false {
-		return nil, fmt.Errorf("user in the context is empty")
-	}
-
-	users, err := u.repo.List(u.repo.OrganizationFilter(userInfo.GetOrganizationId()),
+func (u *UserUsecase) GetByAccountId(ctx context.Context, accountId string, organizationId string) (*domain.User, error) {
+	users, err := u.repo.List(u.repo.OrganizationFilter(organizationId),
 		u.repo.AccountIdFilter(accountId))
 	if err != nil {
 		return nil, err
@@ -278,13 +264,8 @@ func (u *UserUsecase) UpdateByAccountId(ctx context.Context, accountId string, u
 	return user, nil
 }
 
-func (u *UserUsecase) DeleteByAccountId(ctx context.Context, accountId string) error {
-	userInfo, ok := request.UserFrom(ctx)
-	if ok == false {
-		return fmt.Errorf("user in the context is empty")
-	}
-
-	user, err := u.repo.Get(accountId, userInfo.GetOrganizationId())
+func (u *UserUsecase) DeleteByAccountId(ctx context.Context, accountId string, organizationId string) error {
+	user, err := u.repo.Get(accountId, organizationId)
 	if err != nil {
 		return err
 	}
@@ -303,7 +284,7 @@ func (u *UserUsecase) DeleteByAccountId(ctx context.Context, accountId string) e
 	if ok == false {
 		return fmt.Errorf("token in the context is empty")
 	}
-	err = u.kc.DeleteUser(userInfo.GetOrganizationId(), accountId, token)
+	err = u.kc.DeleteUser(organizationId, accountId, token)
 	if err != nil {
 		return err
 	}
