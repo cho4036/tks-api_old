@@ -176,7 +176,7 @@ func (u *UserUsecase) UpdatePasswordByAccountId(ctx context.Context, accountId s
 	if err != nil {
 		return errors.Wrap(err, "getting user from repository failed")
 	}
-	uuid, err := uuid.Parse(user.ID)
+	userUuid, err := uuid.Parse(user.ID)
 	if err != nil {
 		return errors.Wrap(err, "parsing uuid failed")
 	}
@@ -185,7 +185,18 @@ func (u *UserUsecase) UpdatePasswordByAccountId(ctx context.Context, accountId s
 		return errors.Wrap(err, "hashing password failed")
 	}
 
-	_, err = u.repo.UpdateWithUuid(uuid, user.AccountId, user.Name, hashedPassword, user.Email,
+	roles, err := u.repo.FetchRoles()
+	if err != nil {
+		return err
+	}
+	for _, role := range *roles {
+		if role.Name == user.Role.Name {
+			user.Role.ID = role.ID
+		}
+	}
+	roleUuid, err := uuid.Parse(user.Role.ID)
+
+	_, err = u.repo.UpdateWithUuid(userUuid, user.AccountId, user.Name, hashedPassword, roleUuid, user.Email,
 		user.Department, user.Description)
 	if err != nil {
 		return errors.Wrap(err, "updating user in repository failed")
@@ -255,7 +266,18 @@ func (u *UserUsecase) UpdateByAccountId(ctx context.Context, accountId string, u
 
 	originPassword := (*users)[0].Password
 
-	*user, err = u.repo.UpdateWithUuid(userUuid, user.AccountId, user.Name, originPassword, user.Email,
+	roles, err := u.repo.FetchRoles()
+	if err != nil {
+		return nil, err
+	}
+	for _, role := range *roles {
+		if role.Name == user.Role.Name {
+			user.Role.ID = role.ID
+		}
+	}
+	roleUuid, err := uuid.Parse(user.Role.ID)
+
+	*user, err = u.repo.UpdateWithUuid(userUuid, user.AccountId, user.Name, originPassword, roleUuid, user.Email,
 		user.Department, user.Description)
 	if err != nil {
 		return nil, errors.Wrap(err, "updating user in repository failed")
