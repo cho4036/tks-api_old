@@ -976,16 +976,24 @@ definitions:
         maxLength: 100
         minLength: 0
         type: string
+      name:
+        maxLength: 20
+        minLength: 3
+        type: string
       phone:
         type: string
       primaryClusterId:
         type: string
+    required:
+    - name
     type: object
   domain.UpdateOrganizationResponse:
     properties:
       description:
         type: string
       id:
+        type: string
+      name:
         type: string
       phone:
         type: string

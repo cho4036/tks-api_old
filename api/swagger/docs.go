@@ -2974,11 +2974,19 @@ const docTemplate = `{
         },
         "domain.UpdateOrganizationRequest": {
             "type": "object",
+            "required": [
+                "name"
+            ],
             "properties": {
                 "description": {
                     "type": "string",
                     "maxLength": 100,
                     "minLength": 0
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "minLength": 3
                 },
                 "phone": {
                     "type": "string"
@@ -2995,6 +3003,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "phone": {

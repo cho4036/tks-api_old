@@ -114,8 +114,10 @@ func (u UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("error is :%s(%T)", err.Error(), err)
 
 		if _, status := httpErrors.ErrorResponse(err); status == http.StatusNotFound {
-			ErrorJSON(w, httpErrors.NewNoContentError(err))
+			ErrorJSON(w, httpErrors.NewBadRequestError(err))
+			return
 		}
+
 		ErrorJSON(w, err)
 		return
 	}

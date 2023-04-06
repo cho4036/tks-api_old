@@ -119,6 +119,10 @@ func (h *OrganizationHandler) GetOrganization(w http.ResponseWriter, r *http.Req
 	organization, err := h.usecase.Get(organizationId)
 	if err != nil {
 		log.Errorf("error is :%s(%T)", err.Error(), err)
+		if _, status := httpErrors.ErrorResponse(err); status == http.StatusNotFound {
+			ErrorJSON(w, httpErrors.NewBadRequestError(err))
+			return
+		}
 
 		ErrorJSON(w, err)
 		return
@@ -166,7 +170,10 @@ func (h *OrganizationHandler) DeleteOrganization(w http.ResponseWriter, r *http.
 	err = h.usecase.Delete(organizationId, token)
 	if err != nil {
 		log.Errorf("error is :%s(%T)", err.Error(), err)
-
+		if _, status := httpErrors.ErrorResponse(err); status == http.StatusNotFound {
+			ErrorJSON(w, httpErrors.NewBadRequestError(err))
+			return
+		}
 		ErrorJSON(w, err)
 		return
 	}
@@ -203,7 +210,10 @@ func (h *OrganizationHandler) UpdateOrganization(w http.ResponseWriter, r *http.
 	organization, err := h.usecase.Update(organizationId, input)
 	if err != nil {
 		log.Errorf("error is :%s(%T)", err.Error(), err)
-
+		if _, status := httpErrors.ErrorResponse(err); status == http.StatusNotFound {
+			ErrorJSON(w, httpErrors.NewBadRequestError(err))
+			return
+		}
 		ErrorJSON(w, err)
 		return
 	}
@@ -242,6 +252,10 @@ func (h *OrganizationHandler) UpdatePrimaryCluster(w http.ResponseWriter, r *htt
 
 	err = h.usecase.UpdatePrimaryClusterId(organizationId, input.PrimaryClusterId)
 	if err != nil {
+		if _, status := httpErrors.ErrorResponse(err); status == http.StatusNotFound {
+			ErrorJSON(w, httpErrors.NewBadRequestError(err))
+			return
+		}
 		ErrorJSON(w, err)
 		return
 	}
